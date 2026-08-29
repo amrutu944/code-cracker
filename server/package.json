@@ -1,0 +1,14 @@
+{
+  "name": "code-cracker-server",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "description": "Static-serving Express backend for the Code Cracker production build.",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js"
+  },
+  "dependencies": {
+    "express": "^4.19.2"
+  }
+}
