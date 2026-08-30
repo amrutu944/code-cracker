@@ -15,8 +15,8 @@ import SettingsModal from '../../components/SettingsModal.jsx';
 import ShortcutsModal from '../../components/ShortcutsModal.jsx';
 
 import { useCodeRunner } from '../../hooks/useCodeRunner.js';
-import { useAutosave } from '../../hooks/useAutosave.js';
 import * as projectStorage from '../../services/projectStorage.js';
+import NewProjectDialog from '../../components/NewProjectDialog.jsx';
 
 import {
   Save,
@@ -82,6 +82,9 @@ export default function Playground() {
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [shortcutsOpen, setShortcutsOpen] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [consoleHeight, setConsoleHeight] = useState(220);
+  const previewColumnRef = useRef(null);
+  const [saveDialogOpen, setSaveDialogOpen] = useState(false);
 
   // Settings
   const [editorSettings, setEditorSettings] = useState({
@@ -129,31 +132,6 @@ export default function Playground() {
     setOutput('');
     setExecutionError('');
   }, [projectId]);
-
-  const persist = useCallback(
-    (nextCode) => {
-      if (!project) return;
-      const data = {
-        ...nextCode,
-        language,
-        code: programCode,
-        input,
-      };
-
-      if (!project.id) {
-        const created = projectStorage.createProject(project.name, data);
-        setProject(created);
-        navigate(`/playground/${created.id}`, { replace: true });
-        return;
-      }
-
-      const updated = projectStorage.updateProject(project.id, data);
-      setProject(updated);
-    },
-    [project, language, programCode, input, navigate]
-  );
-
-  const { saveNow } = useAutosave(code, persist);
 
   function handleLanguageChange(nextLanguage) {
     setLanguage(nextLanguage);
@@ -216,15 +194,66 @@ export default function Playground() {
         runCode();
       } else if ((e.ctrlKey || e.metaKey) && e.key === 's') {
         e.preventDefault();
-        saveNow();
+        setSaveDialogOpen(true);
       }
     }
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [runCode, saveNow]);
+  }, [runCode]);
 
   function handleSave() {
-    saveNow();
+    setSaveDialogOpen(true);
+  }
+
+  function saveProject(name) {
+    const projectData = {
+      ...code,
+      language,
+      code: programCode,
+      input,
+    };
+
+    if (project.id) {
+      setProject(projectStorage.updateProject(project.id, { ...projectData, name }));
+    } else {
+      const created = projectStorage.createProject(name, projectData);
+      setProject(created);
+      navigate(`/playground/${created.id}`, { replace: true });
+    }
+
+    setSaveDialogOpen(false);
+  }
+
+  function startConsoleResize(event) {
+    event.preventDefault();
+    const containerHeight = previewColumnRef.current?.getBoundingClientRect().height || 0;
+    const startY = event.clientY;
+    const startHeight = consoleHeight;
+    const minConsoleHeight = 120;
+    const maxConsoleHeight = Math.max(minConsoleHeight, containerHeight - 180);
+
+    function resize(moveEvent) {
+      const nextHeight = startHeight + startY - moveEvent.clientY;
+      setConsoleHeight(Math.min(maxConsoleHeight, Math.max(minConsoleHeight, nextHeight)));
+    }
+
+    function stopResize() {
+      document.body.style.userSelect = '';
+      document.body.style.cursor = '';
+      window.removeEventListener('pointermove', resize);
+      window.removeEventListener('pointerup', stopResize);
+    }
+
+    document.body.style.userSelect = 'none';
+    document.body.style.cursor = 'row-resize';
+    window.addEventListener('pointermove', resize);
+    window.addEventListener('pointerup', stopResize, { once: true });
+  }
+
+  function resizeConsoleBy(amount) {
+    const containerHeight = previewColumnRef.current?.getBoundingClientRect().height || 0;
+    const maxConsoleHeight = Math.max(120, containerHeight - 180);
+    setConsoleHeight((current) => Math.min(maxConsoleHeight, Math.max(120, current + amount)));
   }
 
   function handleCopyCode() {
@@ -431,11 +460,38 @@ export default function Playground() {
             />
           </div>
 
-          <div className="grid min-h-0 grid-rows-[minmax(0,1fr)_minmax(160px,220px)]">
+          <div
+            ref={previewColumnRef}
+            className="grid min-h-0"
+            style={{ gridTemplateRows: `minmax(180px, 1fr) 10px minmax(120px, ${consoleHeight}px)` }}
+          >
             <div className="min-h-0">
               <Preview srcDoc={srcDoc} iframeRef={iframeRef} onRefresh={runCode} runId={runId} />
             </div>
-            <div className="min-h-0 border-t border-cc-border">
+            <div
+              role="separator"
+              aria-label="Resize console"
+              aria-orientation="horizontal"
+              aria-valuemin={120}
+              aria-valuenow={Math.round(consoleHeight)}
+              tabIndex={0}
+              onPointerDown={startConsoleResize}
+              onKeyDown={(event) => {
+                if (event.key === 'ArrowUp') {
+                  event.preventDefault();
+                  resizeConsoleBy(24);
+                }
+                if (event.key === 'ArrowDown') {
+                  event.preventDefault();
+                  resizeConsoleBy(-24);
+                }
+              }}
+              className="group relative z-10 flex cursor-row-resize items-center justify-center bg-cc-panel2 outline-none hover:bg-cc-accent/10 focus-visible:bg-cc-accent/15"
+              title="Drag to resize console"
+            >
+              <span className="h-1 w-10 rounded-full bg-cc-border transition group-hover:bg-cc-accent group-focus-visible:bg-cc-accent" />
+            </div>
+            <div className="min-h-0">
               <Console entries={consoleEntries} onClear={clearConsole} />
             </div>
           </div>
@@ -459,20 +515,47 @@ export default function Playground() {
               />
             </div>
 
-            <div className="flex shrink-0 justify-end border-t border-slate-800 bg-[#111827] px-4 py-2.5">
-              <button
-                type="button"
-                onClick={runCode}
-                className="inline-flex items-center gap-1.5 rounded-lg bg-cc-accent px-5 py-1.5 text-xs font-bold text-black shadow-sm shadow-cc-accent/20 hover:brightness-110 active:scale-95"
-              >
+            <div className="flex shrink-0 justify-end gap-2.5 border-t border-slate-800 bg-[#111827] px-4 py-2.5">
+              <button type="button" onClick={handleSave} className="inline-flex items-center gap-1.5 rounded-lg border border-slate-700 px-3.5 py-1.5 text-xs font-semibold text-slate-300 transition hover:border-slate-500 hover:bg-slate-800 hover:text-white">
+                <Save className="h-3.5 w-3.5" />
+                <span>Save</span>
+              </button>
+              <button type="button" onClick={runCode} className="inline-flex items-center gap-1.5 rounded-lg bg-cc-accent px-5 py-1.5 text-xs font-bold text-black shadow-sm shadow-cc-accent/20 hover:brightness-110 active:scale-95">
                 <Play className="h-3.5 w-3.5 fill-black" />
                 <span>Run Code</span>
               </button>
             </div>
           </div>
 
-          <div className="grid min-h-0 grid-rows-2 gap-3 bg-cc-bg p-3">
+          <div
+            ref={previewColumnRef}
+            className="grid min-h-0 bg-cc-bg p-3"
+            style={{ gridTemplateRows: `minmax(160px, 1fr) 10px minmax(120px, ${consoleHeight}px)` }}
+          >
             <InputPanel value={input} onChange={setInput} />
+            <div
+              role="separator"
+              aria-label="Resize output panel"
+              aria-orientation="horizontal"
+              aria-valuemin={120}
+              aria-valuenow={Math.round(consoleHeight)}
+              tabIndex={0}
+              onPointerDown={startConsoleResize}
+              onKeyDown={(event) => {
+                if (event.key === 'ArrowUp') {
+                  event.preventDefault();
+                  resizeConsoleBy(24);
+                }
+                if (event.key === 'ArrowDown') {
+                  event.preventDefault();
+                  resizeConsoleBy(-24);
+                }
+              }}
+              className="group relative z-10 flex cursor-row-resize items-center justify-center outline-none hover:bg-cc-accent/10 focus-visible:bg-cc-accent/15"
+              title="Drag to resize output panel"
+            >
+              <span className="h-1 w-10 rounded-full bg-cc-border transition group-hover:bg-cc-accent group-focus-visible:bg-cc-accent" />
+            </div>
             <OutputPanel output={output} error={executionError} />
           </div>
         </div>
@@ -491,6 +574,15 @@ export default function Playground() {
         onUpdateSettings={setEditorSettings}
       />
       <ShortcutsModal open={shortcutsOpen} onClose={() => setShortcutsOpen(false)} />
+
+      <NewProjectDialog
+        open={saveDialogOpen}
+        initialName={project.name || 'Untitled Project'}
+        title={project.id ? 'Save project' : 'Save a new project'}
+        submitLabel="Save Project"
+        onCreate={saveProject}
+        onCancel={() => setSaveDialogOpen(false)}
+      />
 
       <ConfirmDialog
         open={resetDialogOpen}
