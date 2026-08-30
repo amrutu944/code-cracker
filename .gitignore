@@ -2,3 +2,7 @@ node_modules
 dist
 .DS_Store
 *.log
+*.txt
+*.db
+.env
+code_cracker_data.json
