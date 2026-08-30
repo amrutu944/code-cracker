@@ -2,6 +2,28 @@
 @tailwind components;
 @tailwind utilities;
 
+:root {
+  --cc-bg: 247 245 240;
+  --cc-panel: 255 253 249;
+  --cc-panel2: 240 237 230;
+  --cc-border: 225 219 208;
+  --cc-accent: 22 163 74;
+  --cc-accent2: 2 132 199;
+  --cc-text: 23 32 51;
+  --cc-muted: 102 112 133;
+}
+
+.dark {
+  --cc-bg: 13 17 23;
+  --cc-panel: 17 22 29;
+  --cc-panel2: 22 27 34;
+  --cc-border: 43 52 64;
+  --cc-accent: 34 197 94;
+  --cc-accent2: 56 189 248;
+  --cc-text: 230 237 243;
+  --cc-muted: 152 163 179;
+}
+
 html,
 body,
 #root {
@@ -9,9 +31,10 @@ body,
 }
 
 body {
-  background-color: #f7f5f0;
+  background-color: rgb(var(--cc-bg));
+  color: rgb(var(--cc-text));
 }
 
 * {
-  scrollbar-color: #d9d4c9 #f7f5f0;
+  scrollbar-color: rgb(var(--cc-border)) rgb(var(--cc-bg));
 }

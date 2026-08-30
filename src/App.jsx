@@ -9,9 +9,12 @@ import Challenges from './pages/Challenges/Challenges.jsx';
 import Learn from './pages/Learn/Learn.jsx';
 import Login from './pages/Login/Login.jsx';
 import Register from './pages/Register/Register.jsx';
+import Profile from './pages/Profile/Profile.jsx';
+import { ThemeProvider } from './context/ThemeContext.jsx';
 
 export default function App() {
   return (
+    <ThemeProvider>
     <AuthProvider>
       <Routes>
         <Route element={<MainLayout />}>
@@ -20,6 +23,7 @@ export default function App() {
           <Route path="/register" element={<Register />} />
           <Route path="/challenges" element={<Challenges />} />
           <Route path="/learn" element={<Learn />} />
+          <Route path="/profile" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
 
           {/* Protected Routes */}
           <Route
@@ -51,5 +55,6 @@ export default function App() {
         </Route>
       </Routes>
     </AuthProvider>
+    </ThemeProvider>
   );
 }

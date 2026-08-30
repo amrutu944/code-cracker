@@ -6,14 +6,14 @@ export default {
     extend: {
       colors: {
         cc: {
-          bg: '#f7f5f0',
-          panel: '#fffdf9',
-          panel2: '#f0ede6',
-          border: '#e1dbd0',
-          accent: '#16a34a',
-          accent2: '#0284c7',
-          text: '#172033',
-          muted: '#667085',
+          bg: 'rgb(var(--cc-bg) / <alpha-value>)',
+          panel: 'rgb(var(--cc-panel) / <alpha-value>)',
+          panel2: 'rgb(var(--cc-panel2) / <alpha-value>)',
+          border: 'rgb(var(--cc-border) / <alpha-value>)',
+          accent: 'rgb(var(--cc-accent) / <alpha-value>)',
+          accent2: 'rgb(var(--cc-accent2) / <alpha-value>)',
+          text: 'rgb(var(--cc-text) / <alpha-value>)',
+          muted: 'rgb(var(--cc-muted) / <alpha-value>)',
         },
       },
       fontFamily: {
