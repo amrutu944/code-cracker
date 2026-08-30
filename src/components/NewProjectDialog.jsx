@@ -1,15 +1,22 @@
 import { useEffect, useRef, useState } from 'react';
 
-export default function NewProjectDialog({ open, onCreate, onCancel }) {
+export default function NewProjectDialog({
+  open,
+  onCreate,
+  onCancel,
+  initialName = 'My First Website',
+  title = 'Create a new project',
+  submitLabel = 'Create Project',
+}) {
   const [name, setName] = useState('My First Website');
   const inputRef = useRef(null);
 
   useEffect(() => {
     if (open) {
-      setName('My First Website');
+      setName(initialName);
       setTimeout(() => inputRef.current?.select(), 0);
     }
-  }, [open]);
+  }, [open, initialName]);
 
   if (!open) return null;
 
@@ -29,9 +36,7 @@ export default function NewProjectDialog({ open, onCreate, onCancel }) {
       }}
     >
       <form onSubmit={handleSubmit} className="w-full max-w-sm rounded-cc border border-cc-border bg-cc-panel p-5 shadow-2xl">
-        <h2 id="new-project-title" className="text-base font-semibold text-cc-text">
-          Create a new project
-        </h2>
+        <h2 id="new-project-title" className="text-base font-semibold text-cc-text">{title}</h2>
         <label htmlFor="project-name" className="mt-4 block text-xs font-medium text-cc-muted">
           Project name
         </label>
@@ -56,7 +61,7 @@ export default function NewProjectDialog({ open, onCreate, onCancel }) {
             type="submit"
             className="rounded-md bg-cc-accent px-3 py-1.5 text-sm font-semibold text-black hover:brightness-110 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-cc-accent2"
           >
-            Create Project
+            {submitLabel}
           </button>
         </div>
       </form>

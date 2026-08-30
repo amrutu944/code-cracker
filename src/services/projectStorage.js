@@ -1,9 +1,6 @@
-// projectStorage.js
-// Storage service for Code Cracker projects.
-// Version 1 persists to browser localStorage. All localStorage access in the
-// application must go through this module so the storage backend can be
-// swapped for a database/API later without touching UI code.
+import { getAuthHeaders, getStoredToken } from './authService.js';
 
+const API_BASE_URL = 'http://localhost:4000';
 const STORAGE_KEY = 'codecracker.projects';
 
 const DEFAULT_HTML = `<h1>Hello, Code Cracker!</h1>
@@ -26,6 +23,9 @@ export const STARTER_CODE = {
   javascript: DEFAULT_JS,
 };
 
+// In-memory cache for immediate synchronous return
+let cachedProjects = [];
+
 function isStorageAvailable() {
   try {
     const testKey = '__codecracker_test__';
@@ -37,7 +37,7 @@ function isStorageAvailable() {
   }
 }
 
-function readAll() {
+function readLocalStorage() {
   if (!isStorageAvailable()) return [];
   try {
     const raw = window.localStorage.getItem(STORAGE_KEY);
@@ -49,62 +49,146 @@ function readAll() {
   }
 }
 
-function writeAll(projects) {
-  if (!isStorageAvailable()) {
-    throw new Error('Your browser storage is unavailable, so projects cannot be saved right now.');
-  }
+function writeLocalStorage(projects) {
+  if (!isStorageAvailable()) return;
   try {
     window.localStorage.setItem(STORAGE_KEY, JSON.stringify(projects));
   } catch {
-    throw new Error('Could not save your project. Your browser storage might be full.');
+    // Local storage full
   }
 }
 
-function generateId() {
-  return `proj_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`;
+// Background sync with Backend API when authenticated
+export async function syncProjectsFromBackend() {
+  const token = getStoredToken();
+  if (!token) return readLocalStorage();
+
+  try {
+    const response = await fetch(`${API_BASE_URL}/api/projects`, {
+      headers: { ...getAuthHeaders() },
+    });
+    if (response.ok) {
+      const data = await response.json();
+      if (data.success && Array.isArray(data.projects)) {
+        cachedProjects = data.projects;
+        writeLocalStorage(data.projects);
+        return data.projects;
+      }
+    }
+  } catch (err) {
+    console.warn('Backend projects sync fallback to local cache:', err.message);
+  }
+
+  cachedProjects = readLocalStorage();
+  return cachedProjects;
 }
 
 export function getProjects() {
-  return readAll().sort((a, b) => new Date(b.updatedAt) - new Date(a.updatedAt));
+  const token = getStoredToken();
+  if (token && cachedProjects.length > 0) {
+    return [...cachedProjects].sort((a, b) => new Date(b.updatedAt) - new Date(a.updatedAt));
+  }
+  const local = readLocalStorage();
+  return local.sort((a, b) => new Date(b.updatedAt) - new Date(a.updatedAt));
 }
 
 export function getProject(id) {
-  return readAll().find((p) => p.id === id) || null;
+  const all = getProjects();
+  return all.find((p) => p.id === id) || null;
 }
 
 export function createProject(name, code = STARTER_CODE) {
   const trimmedName = (name || '').trim() || 'Untitled Project';
   const now = new Date().toISOString();
-  const project = {
-    id: generateId(),
+
+  const newProject = {
+    id: `proj_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`,
     name: trimmedName,
     html: code.html ?? DEFAULT_HTML,
     css: code.css ?? DEFAULT_CSS,
     javascript: code.javascript ?? DEFAULT_JS,
+    code: code.code ?? '',
+    input: code.input ?? '',
+    language: code.language ?? 'web',
     createdAt: now,
     updatedAt: now,
   };
-  const all = readAll();
-  all.push(project);
-  writeAll(all);
-  return project;
+
+  // Sync to Backend if logged in
+  const token = getStoredToken();
+  if (token) {
+    fetch(`${API_BASE_URL}/api/projects`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        ...getAuthHeaders(),
+      },
+      body: JSON.stringify(newProject),
+    })
+      .then((res) => res.json())
+      .then((data) => {
+        if (data.success && data.project) {
+          syncProjectsFromBackend();
+        }
+      })
+      .catch((err) => console.error('Error saving project to server:', err));
+  }
+
+  const all = readLocalStorage();
+  all.push(newProject);
+  writeLocalStorage(all);
+  cachedProjects = all;
+  return newProject;
 }
 
 export function updateProject(id, updates) {
-  const all = readAll();
+  const all = readLocalStorage();
   const index = all.findIndex((p) => p.id === id);
-  if (index === -1) {
-    throw new Error('That project could not be found. It may have been deleted.');
-  }
+
   const updated = {
-    ...all[index],
+    ...(index !== -1 ? all[index] : {}),
     ...updates,
-    id: all[index].id,
-    createdAt: all[index].createdAt,
+    id,
     updatedAt: new Date().toISOString(),
   };
-  all[index] = updated;
-  writeAll(all);
+
+  if (index !== -1) {
+    all[index] = updated;
+  } else {
+    all.push(updated);
+  }
+
+  writeLocalStorage(all);
+  cachedProjects = all;
+
+  // Sync to backend if logged in
+  const token = getStoredToken();
+  if (token) {
+    fetch(`${API_BASE_URL}/api/projects/${id}`, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+        ...getAuthHeaders(),
+      },
+      body: JSON.stringify(updates),
+    })
+      .then((res) => res.json())
+      .then((data) => {
+        if (!data.success) {
+          // If project didn't exist on server yet, create it
+          fetch(`${API_BASE_URL}/api/projects`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              ...getAuthHeaders(),
+            },
+            body: JSON.stringify(updated),
+          });
+        }
+      })
+      .catch((err) => console.error('Error updating project on server:', err));
+  }
+
   return updated;
 }
 
@@ -117,9 +201,19 @@ export function renameProject(id, newName) {
 }
 
 export function deleteProject(id) {
-  const all = readAll();
+  const all = readLocalStorage();
   const filtered = all.filter((p) => p.id !== id);
-  writeAll(filtered);
+  writeLocalStorage(filtered);
+  cachedProjects = filtered;
+
+  const token = getStoredToken();
+  if (token) {
+    fetch(`${API_BASE_URL}/api/projects/${id}`, {
+      method: 'DELETE',
+      headers: { ...getAuthHeaders() },
+    }).catch((err) => console.error('Error deleting project on server:', err));
+  }
+
   return filtered;
 }
 
@@ -137,6 +231,6 @@ export function markOnboardingSeen() {
   try {
     window.localStorage.setItem('codecracker.onboarding_seen', 'true');
   } catch {
-    // Non-critical, ignore.
+    // Ignored
   }
 }

@@ -6,14 +6,14 @@ export default {
     extend: {
       colors: {
         cc: {
-          bg: '#0d1117',
-          panel: '#11161d',
-          panel2: '#161b22',
-          border: '#232a34',
-          accent: '#22c55e',
-          accent2: '#38bdf8',
-          text: '#e6edf3',
-          muted: '#8b96a5',
+          bg: 'rgb(var(--cc-bg) / <alpha-value>)',
+          panel: 'rgb(var(--cc-panel) / <alpha-value>)',
+          panel2: 'rgb(var(--cc-panel2) / <alpha-value>)',
+          border: 'rgb(var(--cc-border) / <alpha-value>)',
+          accent: 'rgb(var(--cc-accent) / <alpha-value>)',
+          accent2: 'rgb(var(--cc-accent2) / <alpha-value>)',
+          text: 'rgb(var(--cc-text) / <alpha-value>)',
+          muted: 'rgb(var(--cc-muted) / <alpha-value>)',
         },
       },
       fontFamily: {
@@ -21,7 +21,11 @@ export default {
         sans: ['Inter', 'ui-sans-serif', 'system-ui', 'sans-serif'],
       },
       borderRadius: {
-        cc: '10px',
+        cc: '16px',
+      },
+      boxShadow: {
+        soft: '0 12px 32px rgba(15, 23, 42, 0.08)',
+        glow: '0 14px 40px rgba(22, 163, 74, 0.18)',
       },
     },
   },

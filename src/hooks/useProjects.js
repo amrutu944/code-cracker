@@ -10,6 +10,11 @@ export function useProjects() {
     try {
       setProjects(projectStorage.getProjects());
       setError(null);
+      projectStorage.syncProjectsFromBackend().then((synced) => {
+        if (synced && Array.isArray(synced)) {
+          setProjects(synced);
+        }
+      });
     } catch {
       setError('Could not load your saved projects.');
     }
