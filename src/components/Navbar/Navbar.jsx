@@ -50,7 +50,7 @@ export default function Navbar() {
               &lt;/&gt;
             </div>
           </div>
-          <span className="text-lg font-bold tracking-tight text-white">
+          <span className="text-lg font-bold tracking-tight text-cc-text">
             Code <span className="text-cc-accent">Cracker</span>
           </span>
         </NavLink>
@@ -116,37 +116,18 @@ export default function Navbar() {
             {LINKS.map((link) => (
               <NavItem key={link.to} {...link} onClick={() => setMobileOpen(false)} />
             ))}
-
             <div className="mt-2 border-t border-cc-border pt-3">
               {isAuthenticated ? (
                 <div className="flex items-center justify-between">
                   <span className="text-xs font-bold text-cc-text">Signed in as {user?.name}</span>
-                  <button
-                    onClick={() => {
-                      setMobileOpen(false);
-                      handleLogout();
-                    }}
-                    className="flex items-center gap-1 rounded bg-red-500/10 px-3 py-1.5 text-xs font-semibold text-red-400"
-                  >
+                  <button onClick={() => { setMobileOpen(false); handleLogout(); }} className="flex items-center gap-1 rounded bg-red-500/10 px-3 py-1.5 text-xs font-semibold text-red-400">
                     <LogOut className="h-3 w-3" /> Logout
                   </button>
                 </div>
               ) : (
                 <div className="flex gap-2">
-                  <NavLink
-                    to="/login"
-                    onClick={() => setMobileOpen(false)}
-                    className="flex-1 text-center rounded-lg border border-cc-border bg-cc-panel2 py-2 text-xs font-semibold text-cc-text"
-                  >
-                    Login
-                  </NavLink>
-                  <NavLink
-                    to="/register"
-                    onClick={() => setMobileOpen(false)}
-                    className="flex-1 text-center rounded-lg bg-cc-accent py-2 text-xs font-bold text-black"
-                  >
-                    Register
-                  </NavLink>
+                  <NavLink to="/login" onClick={() => setMobileOpen(false)} className="flex-1 text-center rounded-lg border border-cc-border bg-cc-panel2 py-2 text-xs font-semibold text-cc-text">Login</NavLink>
+                  <NavLink to="/register" onClick={() => setMobileOpen(false)} className="flex-1 text-center rounded-lg bg-cc-accent py-2 text-xs font-bold text-black">Register</NavLink>
                 </div>
               )}
             </div>
