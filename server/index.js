@@ -1,10 +1,16 @@
+import 'dotenv/config';
 import express from 'express';
 import path from 'node:path';
 import os from 'node:os';
 import fs from 'node:fs/promises';
-import { spawn, exec } from 'node:child_process';
+import { spawn } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
+
+import { connectDB } from './db.js';
+import authRoutes from './routes/auth.js';
+import projectRoutes from './routes/projects.js';
+import { authenticateToken } from './middleware/auth.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const distDir = path.join(__dirname, '..', 'dist');
@@ -12,10 +18,13 @@ const port = process.env.PORT || 4000;
 
 const app = express();
 
+// Initialize database
+connectDB();
+
 app.use((req, res, next) => {
   res.header('Access-Control-Allow-Origin', '*');
-  res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept');
-  res.header('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+  res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization');
+  res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
   if (req.method === 'OPTIONS') {
     return res.sendStatus(204);
   }
@@ -23,6 +32,10 @@ app.use((req, res, next) => {
 });
 
 app.use(express.json({ limit: '256kb' }));
+
+// Mount Auth & Project routes
+app.use('/api/auth', authRoutes);
+app.use('/api/projects', projectRoutes);
 
 const SUPPORTED_LANGUAGES = ['python3.10', 'python3.8-ml', 'python3.9', 'c', 'cpp', 'java'];
 
@@ -32,6 +45,45 @@ app.get('/api/health', (req, res) => {
     service: 'code-cracker-server',
   });
 });
+
+/**
+ * -----------------------------------------------------------------------
+ * SECURITY NOTICE FOR CODE EXECUTION:
+ * -----------------------------------------------------------------------
+ * WARNING: The code execution logic below runs server-side child processes
+ * with basic timeouts and input validation. Rate limiting and JWT authentication
+ * have been added to prevent unauthorized or spam execution.
+ *
+ * CRITICAL FOR PRODUCTION: Full containerization/isolation (such as Docker,
+ * gVisor, or nsjail with cgroups resource boundaries) is REQUIRED before
+ * exposing this endpoint to untrusted public users in production.
+ * -----------------------------------------------------------------------
+ */
+
+// Custom In-Memory Rate Limiting middleware for /api/execute
+const rateLimitMap = new Map();
+function executionLimiter(req, res, next) {
+  const identifier = req.user?.userId || req.ip || 'global';
+  const now = Date.now();
+  const windowMs = 15 * 60 * 1000; // 15 minute window
+  const max = 30; // Max 30 requests per window
+
+  let record = rateLimitMap.get(identifier);
+  if (!record || now - record.startTime > windowMs) {
+    record = { count: 1, startTime: now };
+    rateLimitMap.set(identifier, record);
+    return next();
+  }
+
+  record.count++;
+  if (record.count > max) {
+    return res.status(429).json({
+      success: false,
+      error: 'Too many code execution requests. Please wait a few minutes before trying again.',
+    });
+  }
+  next();
+}
 
 // Helper: Run Python code safely
 function runPython(code, input) {
@@ -75,7 +127,6 @@ function runPython(code, input) {
 
         python.on('error', () => {
           clearTimeout(timeout);
-          // Fallback python output
           finish({
             success: true,
             output: stdout || 'Program executed successfully.',
@@ -102,7 +153,6 @@ function runPython(code, input) {
   });
 }
 
-// Helper: Run C / C++ / Java code safely
 function runCompiledLanguage(language, code, input) {
   return new Promise((resolve) => {
     let stdout = `[Execution Output for ${language}]\n`;
@@ -121,8 +171,8 @@ function runCompiledLanguage(language, code, input) {
   });
 }
 
-// Execute API
-app.post('/api/execute', async (req, res) => {
+// Protected & Rate-limited Execute API
+app.post('/api/execute', authenticateToken, executionLimiter, async (req, res) => {
   try {
     const body = req.body || {};
     const language = typeof body.language === 'string' ? body.language.trim() : '';

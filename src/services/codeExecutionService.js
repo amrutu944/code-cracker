@@ -1,3 +1,5 @@
+import { getAuthHeaders } from './authService.js';
+
 const API_BASE_URL = 'http://localhost:4000';
 
 /**
@@ -5,22 +7,15 @@ const API_BASE_URL = 'http://localhost:4000';
  */
 function evaluatePythonClientSide(code, input = '') {
   let output = '';
-  let error = '';
-
-  // Extract print statements
-  const printRegex = /print\((.*?)\)/g;
-  let match;
   const lines = code.split('\n');
 
   try {
     for (const line of lines) {
       const trimmed = line.trim();
 
-      // Simple print handler for string literals or sum()
       if (trimmed.startsWith('print(')) {
         const inner = trimmed.slice(6, -1).trim();
         if (inner.startsWith('f"') || inner.startsWith("f'")) {
-          // f-string basic resolution
           let content = inner.slice(2, -1);
           content = content.replace(/\{([^}]+)\}/g, (_, expr) => {
             if (expr === 'total' || expr === 'sum(numbers)') return '150';
@@ -36,7 +31,6 @@ function evaluatePythonClientSide(code, input = '') {
           if (inner.includes('racecar')) output += 'racecar: True\n';
           if (inner.includes('python')) output += 'python: False\n';
         } else {
-          // Remove quotes if plain string
           const clean = inner.replace(/^["']|["']$/g, '');
           output += clean + '\n';
         }
@@ -62,7 +56,7 @@ function evaluatePythonClientSide(code, input = '') {
 }
 
 /**
- * Execute code through the Code Cracker backend with graceful client-side fallback.
+ * Execute code through the Code Cracker backend with authentication & fallback.
  */
 export async function executeCode({ language, code, input = '' }) {
   try {
@@ -73,6 +67,7 @@ export async function executeCode({ language, code, input = '' }) {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
+        ...getAuthHeaders(),
       },
       body: JSON.stringify({
         language,
@@ -89,7 +84,7 @@ export async function executeCode({ language, code, input = '' }) {
       return data;
     }
   } catch (err) {
-    // Backend API unavailable or timed out - use intelligent client sandbox fallback!
+    // Backend API unavailable or timed out - use fallback
   }
 
   // Fallback handler for Python & C/C++/Java when server backend is offline

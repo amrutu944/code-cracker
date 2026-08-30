@@ -1,6 +1,7 @@
 import { useState } from 'react';
-import { NavLink } from 'react-router-dom';
-import { Code2, FolderGit2, Trophy, BookOpen, Menu, X, Home } from 'lucide-react';
+import { NavLink, useNavigate } from 'react-router-dom';
+import { useAuth } from '../../context/AuthContext.jsx';
+import { Code2, FolderGit2, Trophy, BookOpen, Menu, X, Home, LogIn, UserPlus, LogOut, User } from 'lucide-react';
 
 const LINKS = [
   { to: '/', label: 'Home', icon: Home },
@@ -31,7 +32,14 @@ function NavItem({ to, label, icon: Icon, onClick }) {
 }
 
 export default function Navbar() {
+  const { user, isAuthenticated, logout } = useAuth();
+  const navigate = useNavigate();
   const [mobileOpen, setMobileOpen] = useState(false);
+
+  function handleLogout() {
+    logout();
+    navigate('/login');
+  }
 
   return (
     <header className="sticky top-0 z-40 border-b border-cc-border bg-cc-bg/95 backdrop-blur-md">
@@ -53,6 +61,44 @@ export default function Navbar() {
           ))}
         </div>
 
+        {/* Right Auth Section */}
+        <div className="hidden items-center gap-2.5 md:flex">
+          {isAuthenticated ? (
+            <div className="flex items-center gap-3 border-l border-cc-border pl-3">
+              <div className="flex items-center gap-2 rounded-lg bg-cc-panel2 px-3 py-1.5 border border-cc-border">
+                <User className="h-3.5 w-3.5 text-cc-accent" />
+                <span className="text-xs font-bold text-cc-text">{user?.name}</span>
+              </div>
+              <button
+                type="button"
+                onClick={handleLogout}
+                title="Log out"
+                className="flex items-center gap-1.5 rounded-lg border border-cc-border bg-cc-panel px-3 py-1.5 text-xs font-semibold text-cc-muted hover:bg-red-500/10 hover:text-red-400 hover:border-red-500/30 transition"
+              >
+                <LogOut className="h-3.5 w-3.5" />
+                <span>Logout</span>
+              </button>
+            </div>
+          ) : (
+            <div className="flex items-center gap-2">
+              <NavLink
+                to="/login"
+                className="flex items-center gap-1.5 rounded-lg border border-cc-border bg-cc-panel px-3.5 py-1.5 text-xs font-semibold text-cc-text hover:bg-cc-panel2 transition"
+              >
+                <LogIn className="h-3.5 w-3.5" />
+                <span>Login</span>
+              </NavLink>
+              <NavLink
+                to="/register"
+                className="flex items-center gap-1.5 rounded-lg bg-cc-accent px-3.5 py-1.5 text-xs font-bold text-black shadow-sm shadow-cc-accent/20 hover:brightness-110 transition"
+              >
+                <UserPlus className="h-3.5 w-3.5" />
+                <span>Register</span>
+              </NavLink>
+            </div>
+          )}
+        </div>
+
         <button
           type="button"
           className="flex h-10 w-10 items-center justify-center rounded-lg text-cc-text hover:bg-cc-panel2 md:hidden"
@@ -70,6 +116,40 @@ export default function Navbar() {
             {LINKS.map((link) => (
               <NavItem key={link.to} {...link} onClick={() => setMobileOpen(false)} />
             ))}
+
+            <div className="mt-2 border-t border-cc-border pt-3">
+              {isAuthenticated ? (
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-bold text-cc-text">Signed in as {user?.name}</span>
+                  <button
+                    onClick={() => {
+                      setMobileOpen(false);
+                      handleLogout();
+                    }}
+                    className="flex items-center gap-1 rounded bg-red-500/10 px-3 py-1.5 text-xs font-semibold text-red-400"
+                  >
+                    <LogOut className="h-3 w-3" /> Logout
+                  </button>
+                </div>
+              ) : (
+                <div className="flex gap-2">
+                  <NavLink
+                    to="/login"
+                    onClick={() => setMobileOpen(false)}
+                    className="flex-1 text-center rounded-lg border border-cc-border bg-cc-panel2 py-2 text-xs font-semibold text-cc-text"
+                  >
+                    Login
+                  </NavLink>
+                  <NavLink
+                    to="/register"
+                    onClick={() => setMobileOpen(false)}
+                    className="flex-1 text-center rounded-lg bg-cc-accent py-2 text-xs font-bold text-black"
+                  >
+                    Register
+                  </NavLink>
+                </div>
+              )}
+            </div>
           </div>
         </div>
       )}
